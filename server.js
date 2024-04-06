@@ -1,71 +1,78 @@
+const fs = require('fs')
+const path = require('path')
+const express = require('express')
+const app = express()
+const PORT = process.env.PORT || 3000
+const db = require('./Develop/db/db.json')
 
-// Server.js
+//Allows all notes to have a unique ID
+const { v4: uuidv4 } = require('uuid');
 
+//Allows public folder to be unblocked
+app.use(express.static('./Develop/public'))
+app.use(express.json())
 
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const { v4: uuidv4 } = require('uuid'); // UUID for unique note IDs
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// Middleware for parsing JSON and urlencoded form data
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static('./Develop/public')); // Serve static files from 'public' directory
-
-// API Routes
-
-// GET /api/notes - Return all saved notes from db.json as JSON
+//API Routes
+// GET /api/notes should read the db.json file and return all saved notes as JSON.
 app.get('/api/notes', (req, res) => {
-    fs.readFile('./Develop/db/db.json', 'utf8', (err, data) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ message: "Error reading notes" });
-        }
-        res.json(JSON.parse(data));
-    });
-});
+    fs.readFile('./Develop/db/db.json', (err, data) => {
+        ///error logging
+        if (err) throw err;
+        let dbData = JSON.parse(data);
+        //Returns new database
+        res.json(dbData)
+    });   
+})
 
-// POST /api/notes - Receive a new note and add it to db.json
+//POST 
+///api/notes receives a new note to save on the request body and add it to db.json, then returns new note to the client.
 app.post('/api/notes', (req, res) => {
-    const newNote = { ...req.body, id: uuidv4() };
+    //grabs notes from body of request
+    const newNote = req.body
 
-    fs.readFile('./Develop/db/db.json', 'utf8', (err, data) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ message: "Error saving note" });
-        }
-        const notes = JSON.parse(data);
-        notes.push(newNote);
+    //gives each note a random ID
+    newNote.id = uuidv4()
 
-        fs.writeFile('./Develop/db/db.json', JSON.stringify(notes), err => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ message: "Error writing note" });
-            }
-            res.json(newNote);
-        });
-    });
-});
+    //adds the note object to the array
+    db.push(newNote)
 
-// Bonus: DELETE /api/notes/:id - Delete the note with given id
-// Uncomment and implement if needed
+    //update the json file with the new object
+    fs.writeFileSync('./Develop/db/db.json', JSON.stringify(db))
 
-// HTML Routes
+    //responds with the note object used
+    res.json(db)
+})
 
-// GET /notes - Return the notes.html file
+
+//DELETE
+// notes when the button is clicked by removing the note from db.json, saving and showing the updated database on the front end.
+app.delete('/api/notes/:id', (req, res) => {
+    const newDb = db.filter((note) =>
+        note.id !== req.params.id)
+
+    // update the db.json file to reflect the modified notes array
+    fs.writeFileSync('./Develop/db/db.json', JSON.stringify(newDb))
+
+    // send that removed note object back to user
+    res.json(newDb)
+})
+
+//HTML Routes
+//Home
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, './Develop/public/index.html'))
+})
+
+//Notes
 app.get('/notes', (req, res) => {
-    res.sendFile(path.join(__dirname, './Develop/public/notes.html'));
-});
+    res.sendFile(path.join(__dirname, './Develop/public/notes.html'))
+})
 
-// GET * - Return the index.html file
+//Wildcard Route
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, './Develop/public/index.html'));
-});
+    res.sendFile(path.join(__dirname, './Develop/public/index.html'))
+})
 
-// Start the server
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+//App listens with front end on this port
+app.listen(PORT, () =>
+    console.log(`App listening on ${PORT}`))
